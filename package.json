@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
+    "firebase": "^12.6.0",
     "lucide-react": "^0.555.0",
     "next": "16.0.5",
     "radix-ui": "^1.4.3",

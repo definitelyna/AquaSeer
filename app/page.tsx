@@ -1,13 +1,14 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { auth } from "@/firebase";
 
 export default function App() {
   const router = useRouter();
+  const user = auth.currentUser;
 
   // Check for existing session
   useEffect(() => {
-    const user = undefined;
     if (user) {
       router.push("/dashboard");
     } else {

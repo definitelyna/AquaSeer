@@ -7,11 +7,8 @@ import { AddSensorDialog } from "./components/AddSensorDialog";
 import { SensorDetailsDialog } from "./components/SensorDetailsDialog";
 import { Badge } from "../../ui/badge";
 import { useRouter } from "next/navigation";
-
-interface DashboardProps {
-  user: { email: string; name: string } | null;
-  onLogout: () => void;
-}
+import { auth } from "@/firebase";
+import { signOut } from "firebase/auth";
 
 export interface Sensor {
   id: string;
@@ -70,15 +67,16 @@ const initialSensors: Sensor[] = [
   },
 ];
 
-export default function DashboardPage({ user, onLogout }: DashboardProps) {
+export default function DashboardPage() {
   const [sensors, setSensors] = useState<Sensor[]>(initialSensors);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
 
+  const user = auth.currentUser;
+
   const router = useRouter();
 
   useEffect(() => {
-    const user = null;
     if (!user) {
       router.push("/login");
     }
@@ -127,6 +125,13 @@ export default function DashboardPage({ user, onLogout }: DashboardProps) {
     setSensors([...sensors, newSensor]);
   };
 
+  const handleLogOut = () => {
+    signOut(auth).then(() => {
+      console.log("User signed out");
+      router.push("/login");
+    });
+  };
+
   const onlineSensors = sensors.filter((s) => s.status === "online").length;
   const warningSensors = sensors.filter((s) => s.status === "warning").length;
 
@@ -142,7 +147,9 @@ export default function DashboardPage({ user, onLogout }: DashboardProps) {
               </div>
               <div>
                 <h1 className="text-xl text-blue-900">AquaSeer</h1>
-                <p className="text-xs text-gray-500">Welcome, {user?.name}</p>
+                <p className="text-xs text-gray-500">
+                  Welcome, {user?.displayName}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -152,7 +159,7 @@ export default function DashboardPage({ user, onLogout }: DashboardProps) {
               <Button variant="ghost" size="icon">
                 <Settings className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={onLogout}>
+              <Button variant="ghost" size="icon" onClick={handleLogOut}>
                 <LogOut className="w-5 h-5" />
               </Button>
             </div>

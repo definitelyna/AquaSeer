@@ -13,33 +13,74 @@ import {
 } from "@/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Droplets } from "lucide-react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "@/firebase";
+import { useRouter } from "next/navigation";
 
-interface LoginPageProps {
-  onLogin: (email: string, name: string) => void;
-}
-
-export default function LoginPage({ onLogin }: LoginPageProps) {
+export default function LoginPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
-  const [registerPhone, setRegisterPhone] = useState("");
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - in production this would validate against backend
+
     if (loginEmail && loginPassword) {
-      onLogin(loginEmail, loginEmail.split("@")[0]);
+      signInWithEmailAndPassword(auth, loginEmail, loginPassword)
+        .then(() => {
+          console.log("Login successful");
+          router.push("/dashboard");
+        })
+        .catch((error) => {
+          // Handle errors here
+          console.error("Login error:", error);
+          setError("Login failed: " + error.message);
+        });
     }
   };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock registration - in production this would create account in backend
-    if (registerEmail && registerPassword && registerName) {
-      onLogin(registerEmail, registerName);
+
+    if (
+      !registerName ||
+      !registerEmail ||
+      !registerPassword ||
+      !registerConfirmPassword
+    ) {
+      setError("Please fill in all required fields.");
+      return;
+    } else if (registerPassword !== registerConfirmPassword) {
+      setError("Passwords do not match.");
+      return;
     }
+
+    createUserWithEmailAndPassword(auth, registerEmail, registerPassword)
+      .then(() => {
+        if (!auth.currentUser) return;
+
+        updateProfile(auth.currentUser, {
+          displayName: registerName,
+        });
+
+        console.log("Registration successful");
+
+        router.push("/dashboard");
+      })
+      .catch((error) => {
+        setError("Registration failed: " + error.message);
+      });
   };
 
   return (
@@ -74,10 +115,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <CardContent>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email or Phone</Label>
+                    <Label htmlFor="login-email">Email</Label>
                     <Input
                       id="login-email"
-                      type="text"
+                      type="email"
                       placeholder="your@email.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
@@ -95,6 +136,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       required
                     />
                   </div>
+                  {error && <p className="text-red-600">{error}</p>}
                   <Button type="submit" className="w-full">
                     Sign In
                   </Button>
@@ -136,16 +178,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-phone">Phone Number</Label>
-                    <Input
-                      id="register-phone"
-                      type="tel"
-                      placeholder="+84 xxx xxx xxx"
-                      value={registerPhone}
-                      onChange={(e) => setRegisterPhone(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="register-password">Password</Label>
                     <Input
                       id="register-password"
@@ -156,6 +188,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       required
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-confirm-password">
+                      Confirm Password
+                    </Label>
+                    <Input
+                      id="register-confirm-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={registerConfirmPassword}
+                      onChange={(e) =>
+                        setRegisterConfirmPassword(e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  {error && <p className="text-red-600">{error}</p>}
                   <Button type="submit" className="w-full">
                     Create Account
                   </Button>
