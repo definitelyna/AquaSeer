@@ -6,7 +6,7 @@ import { auth } from "../firebase";
 export const useFetchSettings = () => {
   const [settings, setSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid || "default";
@@ -26,7 +26,7 @@ export const useFetchSettings = () => {
       },
       (err) => {
         console.error("useFetchSettings onSnapshot error:", err);
-        setError(err);
+        setError(err.message);
         setLoading(false);
       }
     );

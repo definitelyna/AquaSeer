@@ -5,7 +5,7 @@ import { db } from "@/firebase";
 export const useFetchData = (collectionName: string) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // 1. Create the query (order by timestamp usually makes sense for streams)
@@ -30,7 +30,7 @@ export const useFetchData = (collectionName: string) => {
       },
       (err) => {
         console.error("Stream error:", err);
-        setError(err);
+        setError(err.message);
         setLoading(false);
       }
     );
