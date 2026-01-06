@@ -10,7 +10,6 @@ import { Button } from "../../../ui/button";
 import {
   Thermometer,
   Droplets,
-  Wind,
   MapPin,
   Calendar,
   Settings,

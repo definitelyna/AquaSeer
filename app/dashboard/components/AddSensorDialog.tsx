@@ -43,11 +43,14 @@ export function AddSensorDialog({
       name,
       location,
       status: "online",
-      readings: {
-        temperature: 28.0 + Math.random() * 4,
-        ph: 7.0 + Math.random(),
-        dissolvedOxygen: 6.0 + Math.random() * 2,
-      },
+      warning: false,
+      readings: [
+        {
+          datetime: new Date(),
+          temp: 28.0 + Math.random() * 4,
+          pH: 7.0 + Math.random(),
+        },
+      ],
       schedule,
     };
 
