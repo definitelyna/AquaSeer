@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -32,6 +32,16 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push("/dashboard");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +83,33 @@ export default function LoginPage() {
         updateProfile(auth.currentUser, {
           displayName: registerName,
         });
+
+        (async () => {
+          try {
+            const { getFirestore, doc, getDoc, setDoc } = await import(
+              "firebase/firestore"
+            );
+            const db = getFirestore();
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const settingsRef = doc(db, "user_settings", user.uid);
+            const settingsSnap = await getDoc(settingsRef);
+
+            if (!settingsSnap.exists()) {
+              const defaultSettings = {
+                phThreshold: { min: 6.5, max: 8.5 },
+                temperatureThreshold: { min: 10, max: 45 },
+                measurementSchedule: "Every 2 hours",
+              };
+
+              await setDoc(settingsRef, defaultSettings);
+              console.log("Created default user_settings for", user.uid);
+            }
+          } catch (err) {
+            console.error("Error creating user_settings:", err);
+          }
+        })();
 
         console.log("Registration successful");
 

@@ -26,41 +26,40 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { useState, useEffect } from "react";
 
 interface SensorDetailsDialogProps {
   sensor: Sensor;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  settings: {
+    temperatureThreshold: { min: number; max: number };
+    phThreshold: { min: number; max: number };
+    measurementSchedule: string;
+  };
 }
 
 export function SensorDetailsDialog({
   sensor,
   open,
   onOpenChange,
+  settings,
 }: SensorDetailsDialogProps) {
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const minTemp = settings?.temperatureThreshold?.min ?? 10;
+  const maxTemp = settings?.temperatureThreshold?.max ?? 45;
+  const minPh = settings?.phThreshold?.min ?? 6.5;
+  const maxPh = settings?.phThreshold?.max ?? 8.5;
 
-  useEffect(() => {
-    // Generate mock historical data
-    const generateHistoricalData = () => {
-      const data = [];
-      const now = Date.now();
-      for (let i = 23; i >= 0; i--) {
-        const time = new Date(now - i * 3600000);
-        data.push({
-          time: `${time.getHours()}:00`,
-          temperature: sensor.readings.temperature + (Math.random() - 0.5) * 3,
-          ph: sensor.readings.ph + (Math.random() - 0.5) * 0.5,
-          dissolvedOxygen:
-            sensor.readings.dissolvedOxygen + (Math.random() - 0.5) * 1.5,
-        });
-      }
-      return data;
+  const historicalData = sensor.readings.map((reading) => {
+    console.log(reading);
+    return {
+      time: reading.datetime.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      temperature: reading.temp,
+      ph: reading.pH,
     };
-
-    setHistoricalData(generateHistoricalData());
-  }, [sensor]);
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,9 +96,9 @@ export function SensorDetailsDialog({
           {/* Current Readings */}
           <div>
             <h3 className="text-lg text-gray-900 mb-3">Current Readings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex gap-4">
               {/* Temperature */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <div className="flex-1 bg-blue-50 rounded-lg p-4 border border-blue-100">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-blue-100 p-2 rounded-lg">
                     <Thermometer className="w-5 h-5 text-blue-600" />
@@ -107,13 +106,15 @@ export function SensorDetailsDialog({
                   <span className="text-sm text-gray-600">Temperature</span>
                 </div>
                 <p className="text-2xl text-blue-900">
-                  {sensor.readings.temperature.toFixed(1)}°C
+                  {sensor.readings[0].temp.toFixed(1)}°C
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Range: 10-45°C</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Range: {minTemp}-{maxTemp}°C
+                </p>
               </div>
 
               {/* pH */}
-              <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+              <div className="flex-1 bg-purple-50 rounded-lg p-4 border border-purple-100">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-purple-100 p-2 rounded-lg">
                     <Droplets className="w-5 h-5 text-purple-600" />
@@ -121,23 +122,11 @@ export function SensorDetailsDialog({
                   <span className="text-sm text-gray-600">pH Level</span>
                 </div>
                 <p className="text-2xl text-purple-900">
-                  {sensor.readings.ph.toFixed(1)}
+                  {sensor.readings[0].pH.toFixed(1)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Range: 6.5-8.5</p>
-              </div>
-
-              {/* Dissolved Oxygen */}
-              <div className="bg-cyan-50 rounded-lg p-4 border border-cyan-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-cyan-100 p-2 rounded-lg">
-                    <Wind className="w-5 h-5 text-cyan-600" />
-                  </div>
-                  <span className="text-sm text-gray-600">Dissolved O₂</span>
-                </div>
-                <p className="text-2xl text-cyan-900">
-                  {sensor.readings.dissolvedOxygen.toFixed(1)} mg/L
+                <p className="text-xs text-gray-500 mt-1">
+                  Range: {minPh}-{maxPh}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Range: 5-8 mg/L</p>
               </div>
             </div>
           </div>
@@ -149,9 +138,13 @@ export function SensorDetailsDialog({
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={historicalData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="time" tick={{ fontSize: 12 }} reversed />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value: number) =>
+                      typeof value === "number" ? value.toFixed(2) : value
+                    }
+                  />
                   <Legend />
                   <Line
                     type="monotone"
@@ -159,6 +152,8 @@ export function SensorDetailsDialog({
                     stroke="#2563eb"
                     name="Temperature (°C)"
                     strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
                   />
                   <Line
                     type="monotone"
@@ -166,13 +161,8 @@ export function SensorDetailsDialog({
                     stroke="#9333ea"
                     name="pH"
                     strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="dissolvedOxygen"
-                    stroke="#0891b2"
-                    name="DO (mg/L)"
-                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

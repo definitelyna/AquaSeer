@@ -2,13 +2,19 @@ import { Card, CardContent, CardHeader } from "../../../ui/card";
 import { Badge } from "../../../ui/badge";
 import { Thermometer, Droplets, Wind, MapPin, Clock } from "lucide-react";
 import { Sensor } from "../page";
+import { useFetchSettings } from "@/hooks/useFetchSettings";
 
 interface SensorCardProps {
   sensor: Sensor;
   onClick: () => void;
+  settings: {
+    temperatureThreshold: { min: number; max: number };
+    phThreshold: { min: number; max: number };
+    measurementSchedule: string;
+  };
 }
 
-export function SensorCard({ sensor, onClick }: SensorCardProps) {
+export function SensorCard({ sensor, onClick, settings }: SensorCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "online":
@@ -26,10 +32,17 @@ export function SensorCard({ sensor, onClick }: SensorCardProps) {
     return value < min || value > max;
   };
 
-  const tempOutOfRange = isOutOfRange(sensor.readings.temperature, 10, 45);
-  const phOutOfRange = isOutOfRange(sensor.readings.ph, 6.5, 8.5);
-  const doOutOfRange = isOutOfRange(sensor.readings.dissolvedOxygen, 5, 8);
+  const minTemp = settings?.temperatureThreshold?.min ?? 10;
+  const maxTemp = settings?.temperatureThreshold?.max ?? 45;
+  const minPh = settings?.phThreshold?.min ?? 6.5;
+  const maxPh = settings?.phThreshold?.max ?? 8.5;
 
+  const tempOutOfRange = isOutOfRange(
+    sensor.readings[0].temp,
+    minTemp,
+    maxTemp
+  );
+  const phOutOfRange = isOutOfRange(sensor.readings[0].pH, minPh, maxPh);
   const timeSinceUpdate = Math.floor(
     (Date.now() - sensor.lastUpdate.getTime()) / 1000
   );
@@ -80,7 +93,7 @@ export function SensorCard({ sensor, onClick }: SensorCardProps) {
             <span
               className={`${tempOutOfRange ? "text-red-600" : "text-gray-900"}`}
             >
-              {sensor.readings.temperature.toFixed(1)}°C
+              {sensor.readings[0].temp.toFixed(1)}°C
             </span>
           </div>
 
@@ -103,30 +116,7 @@ export function SensorCard({ sensor, onClick }: SensorCardProps) {
             <span
               className={`${phOutOfRange ? "text-red-600" : "text-gray-900"}`}
             >
-              {sensor.readings.ph.toFixed(1)}
-            </span>
-          </div>
-
-          {/* Dissolved Oxygen */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <div
-                className={`p-2 rounded-lg ${
-                  doOutOfRange ? "bg-red-100" : "bg-cyan-100"
-                }`}
-              >
-                <Wind
-                  className={`w-4 h-4 ${
-                    doOutOfRange ? "text-red-600" : "text-cyan-600"
-                  }`}
-                />
-              </div>
-              <span className="text-sm text-gray-600">Dissolved O₂</span>
-            </div>
-            <span
-              className={`${doOutOfRange ? "text-red-600" : "text-gray-900"}`}
-            >
-              {sensor.readings.dissolvedOxygen.toFixed(1)} mg/L
+              {sensor.readings[0].pH.toFixed(1)}
             </span>
           </div>
 

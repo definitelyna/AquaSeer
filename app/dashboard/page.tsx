@@ -9,18 +9,21 @@ import { Badge } from "../../ui/badge";
 import { useRouter } from "next/navigation";
 import { auth } from "@/firebase";
 import { signOut } from "firebase/auth";
+import { useFetchData } from "@/hooks/useFetchData";
+import { useFetchSettings } from "@/hooks/useFetchSettings";
 
 export interface Sensor {
   id: string;
   name: string;
   location: string;
-  status: "online" | "offline" | "warning";
+  status: "online" | "offline";
   lastUpdate: Date;
+  warning: boolean;
   readings: {
-    temperature: number;
-    ph: number;
-    dissolvedOxygen: number;
-  };
+    datetime: Date;
+    temp: number;
+    pH: number;
+  }[];
   schedule: string;
 }
 
@@ -31,39 +34,16 @@ const initialSensors: Sensor[] = [
     name: "Pond A - Main",
     location: "North Section, Mekong Delta",
     status: "online",
+    warning: false,
     lastUpdate: new Date(),
-    readings: {
-      temperature: 28.5,
-      ph: 7.2,
-      dissolvedOxygen: 6.8,
-    },
+    readings: [
+      {
+        datetime: new Date(),
+        temp: 28.5,
+        pH: 7.2,
+      },
+    ],
     schedule: "Every 2 hours",
-  },
-  {
-    id: "2",
-    name: "Pond B - Secondary",
-    location: "South Section, Mekong Delta",
-    status: "online",
-    lastUpdate: new Date(Date.now() - 300000),
-    readings: {
-      temperature: 29.8,
-      ph: 7.5,
-      dissolvedOxygen: 6.2,
-    },
-    schedule: "Every 4 hours",
-  },
-  {
-    id: "3",
-    name: "Pond C - Nursery",
-    location: "East Section, Mekong Delta",
-    status: "warning",
-    lastUpdate: new Date(Date.now() - 600000),
-    readings: {
-      temperature: 31.2,
-      ph: 8.1,
-      dissolvedOxygen: 5.1,
-    },
-    schedule: "Every 1 hour",
   },
 ];
 
@@ -71,6 +51,12 @@ export default function DashboardPage() {
   const [sensors, setSensors] = useState<Sensor[]>(initialSensors);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
+  const { data, loading, error } = useFetchData("sensor_readings");
+  const {
+    settings,
+    loading: settingsLoading,
+    error: settingsError,
+  } = useFetchSettings();
 
   const user = auth.currentUser;
 
@@ -82,39 +68,63 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Simulate real-time data updates
+  // Update sensor readings when Firestore data changes (real-time).
+  // Use a functional updater so we don't need `sensors` in deps and avoid
+  // re-running the effect on every state update.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSensors((prev) =>
-        prev.map((sensor) => ({
-          ...sensor,
-          lastUpdate: new Date(),
-          readings: {
-            temperature: Math.max(
-              25,
-              Math.min(
-                35,
-                sensor.readings.temperature + (Math.random() - 0.5) * 0.5
-              )
-            ),
-            ph: Math.max(
-              6,
-              Math.min(9, sensor.readings.ph + (Math.random() - 0.5) * 0.2)
-            ),
-            dissolvedOxygen: Math.max(
-              4,
-              Math.min(
-                8,
-                sensor.readings.dissolvedOxygen + (Math.random() - 0.5) * 0.3
-              )
-            ),
-          },
-        }))
-      );
-    }, 5000);
+    if (loading || data.length === 0) return;
 
-    return () => clearInterval(interval);
-  }, []);
+    type Doc = Record<string, any>;
+
+    // Build a quick lookup of the newest reading per identifier (doc order is desc)
+    const readingsMap = new Map<string, Doc>();
+    for (const doc of data as Doc[]) {
+      const key = doc.sensorId || doc.deviceId || doc.sensor_id || doc.id;
+      if (!key) continue;
+      if (!readingsMap.has(key)) {
+        readingsMap.set(key, doc);
+      }
+    }
+
+    setSensors((prevSensors) => {
+      const newSensors = prevSensors.map((sensor) => {
+        const possibleKeys = [sensor.id, `ESP32-${sensor.id}`];
+        let latest: Doc | undefined = undefined;
+        for (const k of possibleKeys) {
+          if (readingsMap.has(k)) {
+            latest = readingsMap.get(k);
+            break;
+          }
+        }
+
+        if (!latest) latest = data[0] as Doc;
+        const lastUpdate = latest.datetime.toDate();
+
+        const warning =
+          settings.phThreshold < latest.pH ||
+          latest.pH < settings.phThreshold.min ||
+          settings.temperatureThreshold.max < latest.temp ||
+          latest.temp < settings.temperatureThreshold.min;
+
+        if (warning && sensor.status === "online") {
+          console.warn(`Warning for sensor ${sensor.id}:`, latest);
+        }
+
+        return {
+          ...sensor,
+          lastUpdate,
+          warning,
+          readings: data.map((eachReading) => ({
+            datetime: eachReading.datetime.toDate(),
+            temp: eachReading.temp,
+            pH: eachReading.pH,
+          })),
+        };
+      });
+
+      return newSensors;
+    });
+  }, [data, loading, settings]);
 
   const handleAddSensor = (sensorData: Omit<Sensor, "id" | "lastUpdate">) => {
     const newSensor: Sensor = {
@@ -133,7 +143,7 @@ export default function DashboardPage() {
   };
 
   const onlineSensors = sensors.filter((s) => s.status === "online").length;
-  const warningSensors = sensors.filter((s) => s.status === "warning").length;
+  const warningSensors = sensors.filter((s) => s.warning).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -231,6 +241,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sensors.map((sensor) => (
             <SensorCard
+              settings={settings}
               key={sensor.id}
               sensor={sensor}
               onClick={() => setSelectedSensor(sensor)}
@@ -261,6 +272,7 @@ export default function DashboardPage() {
       />
       {selectedSensor && (
         <SensorDetailsDialog
+          settings={settings}
           sensor={selectedSensor}
           open={!!selectedSensor}
           onOpenChange={(open) => !open && setSelectedSensor(null)}
