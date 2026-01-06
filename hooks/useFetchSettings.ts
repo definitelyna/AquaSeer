@@ -32,7 +32,7 @@ export const useFetchSettings = () => {
     );
 
     return () => unsubscribe();
-  }, [auth]);
+  }, []);
 
   return { settings, loading, error };
 };
